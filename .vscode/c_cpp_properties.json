@@ -4,15 +4,23 @@
       "name": "Linux",
       "includePath": [
         "${workspaceFolder}/**",
-        "/home/ivan/Arduino/**",
-        "/home/ivan/.arduino15/packages/esp32/**",
-        "/home/ivan/.arduino15/packages/esp32/hardware/esp32/**"
+        "/home/ivan/Arduino/libraries/**",
+        "/home/ivan/.arduino15/packages/esp32/hardware/esp32/3.3.8/cores/esp32",
+        "/home/ivan/.arduino15/packages/esp32/hardware/esp32/3.3.8/variants/esp32",
+        "/home/ivan/.arduino15/packages/esp32/hardware/esp32/3.3.8/libraries/**",
+        "/home/ivan/.arduino15/packages/esp32/tools/esp32-libs/3.3.8/include/**"
       ],
       "defines": [
         "ESP32",
-        "ARDUINO=10805"
+        "ARDUINO=10805",
+        "ARDUINO_ARCH_ESP32"
       ],
-      "compilerPath": "/usr/bin/gcc",
+      "compilerPath": "/home/ivan/.arduino15/packages/esp32/tools/esp-x32/2601/bin/xtensa-esp32-elf-g++",
+      "compilerArgs": [
+        "-fno-exceptions"
+      ],
+      "cStandard": "c11",
+      "cppStandard": "gnu++17",
       "intelliSenseMode": "linux-gcc-x64"
     }
   ],
