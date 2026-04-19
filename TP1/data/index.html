@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>ESP32 Dashboard</h1>
+
+        <div class="cards">
+            <div class="card">
+                <span class="label">Temperature</span>
+                <span class="value" id="temp">--</span>
+                <span class="unit">°C</span>
+            </div>
+            <div class="card">
+                <span class="label">Humidity</span>
+                <span class="value" id="humidity">--</span>
+                <span class="unit">%</span>
+            </div>
+        </div>
+
+        <div class="led-section">
+            <div class="led-indicator" id="ledIndicator"></div>
+            <span id="ledLabel">LED OFF</span>
+            <button id="ledBtn" onclick="toggleLed()">Toggle LED</button>
+        </div>
+
+        <p class="last-update">Last update: <span id="lastUpdate">--</span></p>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+</html>

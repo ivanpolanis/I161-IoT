@@ -1,0 +1,122 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: sans-serif;
+    background: #111;
+    color: #eee;
+    display: flex;
+    justify-content: center;
+    padding: 2rem 1rem;
+    min-height: 100vh;
+}
+
+.container {
+    width: 100%;
+    max-width: 480px;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    font-size: 1.6rem;
+    color: #fff;
+}
+
+.cards {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.card {
+    flex: 1;
+    background: #1e1e1e;
+    border-radius: 12px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    border: 1px solid #333;
+}
+
+.card .label {
+    display: block;
+    font-size: 0.85rem;
+    color: #aaa;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.card .value {
+    font-size: 2.4rem;
+    font-weight: bold;
+    color: #4fc3f7;
+}
+
+.card .unit {
+    font-size: 1rem;
+    color: #aaa;
+    margin-left: 2px;
+}
+
+.led-section {
+    background: #1e1e1e;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.led-indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #333;
+    border: 2px solid #555;
+    transition: background 0.3s, box-shadow 0.3s;
+    flex-shrink: 0;
+}
+
+.led-indicator.on {
+    background: #ffeb3b;
+    box-shadow: 0 0 12px #ffeb3b;
+    border-color: #fdd835;
+}
+
+#ledLabel {
+    flex: 1;
+    font-size: 1rem;
+}
+
+#ledBtn {
+    padding: 0.5rem 1.2rem;
+    background: #4fc3f7;
+    color: #111;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#ledBtn:hover {
+    background: #81d4fa;
+}
+
+#ledBtn:disabled {
+    background: #555;
+    cursor: not-allowed;
+}
+
+.last-update {
+    text-align: center;
+    font-size: 0.78rem;
+    color: #666;
+}
