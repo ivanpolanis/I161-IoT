@@ -1,0 +1,20 @@
+{
+  "configurations": [
+    {
+      "name": "Linux",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "/home/ivan/Arduino/**",
+        "/home/ivan/.arduino15/packages/esp32/**",
+        "/home/ivan/.arduino15/packages/esp32/hardware/esp32/**"
+      ],
+      "defines": [
+        "ESP32",
+        "ARDUINO=10805"
+      ],
+      "compilerPath": "/usr/bin/gcc",
+      "intelliSenseMode": "linux-gcc-x64"
+    }
+  ],
+  "version": 4
+}
