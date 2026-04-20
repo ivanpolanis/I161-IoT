@@ -1,15 +1,20 @@
 #include "wifi.h"
 
 void initializeWifi() {
-  Serial.print("Connecting to WiFi");
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  WiFiManager wifiManager;
 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  wifiManager.setConnectTimeout(30);
+  wifiManager.setConfigPortalTimeout(180);
+
+  Serial.println("Iniciando WiFiManager...");
+
+  if (!wifiManager.autoConnect(WIFI_AP_NAME, WIFI_AP_PASSWORD)) {
+    Serial.println("Error: no se pudo conectar y el portal expiró. Reiniciando...");
+    delay(3000);
+    ESP.restart();
   }
 
-  Serial.println("\nConnected to WiFi");
+  Serial.println("Conectado a WiFi");
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 }
