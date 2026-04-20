@@ -1,7 +1,8 @@
-#include "src/wifi.h"
-#include "src/dht.h"
-#include "src/routes.h"
-#include "src/spiffs_manager.h"
+#include "wifi.h"
+#include "dht.h"
+#include "routes.h"
+#include "spiffs_manager.h"
+#include "led_control.h"
 #include <WebServer.h>
 
 #define DHTPIN 25
@@ -14,6 +15,7 @@ void setup() {
   Serial.begin(115200);
   initializeDHT(DHTPIN, DHTTYPE);
   initializeWifi();
+  initializeLed();
 
   if (!initSPIFFS()) {
     Serial.println("Fatal: SPIFFS init failed");
