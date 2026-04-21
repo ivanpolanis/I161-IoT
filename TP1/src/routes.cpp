@@ -15,7 +15,9 @@ void setupRoutes(WebServer& server) {
     float temperature = readTemperature();
     float humidity = readHumidity();
     bool ledState = readLed();
-    String response = "{\"temperature\": " + String(22) + ", \"humidity\": " + String(22) +  ", \"ledOn\": " + String(ledState ? "true" : "false") + "}";
+    String tempStr = isnan(temperature) ? "--" : String(temperature, 1);
+    String humStr  = isnan(humidity)    ? "--" : String(humidity, 1);
+    String response = "{\"temperature\": " + tempStr + ", \"humidity\": " + humStr + ", \"ledOn\": " + String(ledState ? "true" : "false") + "}";
     server.send(200, "application/json", response); }
   );
 
