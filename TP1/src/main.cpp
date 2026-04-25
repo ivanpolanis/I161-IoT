@@ -6,7 +6,7 @@
 #include <WebServer.h>
 
 #define DHTPIN 25
-#define DHTTYPE DHT22
+#define DHTTYPE DHT11
 
 WebServer server(80);
 
