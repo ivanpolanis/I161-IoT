@@ -1,0 +1,14 @@
+# Dependencias instaladas — se regeneran solas al iniciar el contenedor
+node_modules/
+package-lock.json
+
+# Archivos de estado runtime de Node-RED
+.config.runtime.json
+.config.nodes.json
+.config.users.json
+
+# Credenciales encriptadas (contiene claves, no versionar)
+flows_cred.json
+
+# Logs
+*.log
