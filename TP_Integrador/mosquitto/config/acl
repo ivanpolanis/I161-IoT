@@ -1,0 +1,15 @@
+# ESP32: publica eventos/requests/status, lee respuestas y comandos
+user esp32
+topic readwrite access/+/event
+topic readwrite access/+/request
+topic readwrite access/+/status
+topic read access/+/response
+topic read access/+/command/#
+
+# Node-RED: acceso completo a topics de acceso
+user nodered
+topic readwrite access/#
+
+# Admin: acceso total (diagnóstico y pruebas)
+user admin
+topic readwrite #

@@ -1,0 +1,22 @@
+# Credenciales
+.env
+mosquitto/config/passwd
+nodered/data/.config.runtime.json
+nodered/data/.config.users.json
+
+# Base de datos SQLite (generada en runtime)
+nodered/data/sqlite/
+
+# Datos persistentes de Docker (generados en runtime)
+mosquitto/data/
+
+# Build artifacts
+esp32/.pio/
+esp32/.vscode/
+esp32/src/config.h
+
+# OS
+.DS_Store
+
+node_modules
+.npm

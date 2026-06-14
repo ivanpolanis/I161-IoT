@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm show *)",
+      "Bash(docker run *)",
+      "Bash(> \"$PASSWD_FILE\")",
+      "Bash(sudo chmod 644 /home/ivan/Documents/I161-IoT/TP_Integrador/mosquitto/config/passwd)",
+      "Bash(docker compose *)",
+      "Bash(python3 -m json.tool)"
+    ]
+  }
+}

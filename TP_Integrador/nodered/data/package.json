@@ -1,0 +1,11 @@
+{
+    "name": "node-red-access-control",
+    "description": "Sistema de Control de Acceso RFID - TP Integrador IoT",
+    "version": "1.0.0",
+    "private": true,
+    "dependencies": {
+        "node-red-contrib-influxdb": "~0.7.0",
+        "node-red-contrib-telegrambot": "~17.4.13",
+        "node-red-node-sqlite": "~2.0.1"
+    }
+}
