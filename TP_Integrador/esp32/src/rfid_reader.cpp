@@ -1,15 +1,18 @@
 #include "rfid_reader.h"
 #include "config.h"
-#include <MFRC522.h>
+#include <MFRC522v2.h>
+#include <MFRC522DriverSPI.h>
+#include <MFRC522DriverPinSimple.h>
 #include <SPI.h>
 
-static MFRC522 mfrc522(RC522_SS_PIN, RC522_RST_PIN);
+static MFRC522DriverPinSimple ss_pin(RC522_SS_PIN);
+static MFRC522DriverSPI driver{ss_pin};
+static MFRC522 mfrc522{driver};
 
 void initRfid() {
     SPI.begin();
     mfrc522.PCD_Init();
     delay(4);
-    mfrc522.PCD_DumpVersionToSerial();
 }
 
 bool readUid(String& uid) {
@@ -31,10 +34,7 @@ bool readUid(String& uid) {
     Serial.println();
     uid = buf;
 
-    MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
-    Serial.printf("[RFID] UID: %s  tipo: %s\n",
-                  uid.c_str(),
-                  mfrc522.PICC_GetTypeName(piccType));
+    Serial.printf("[RFID] UID: %s\n", uid.c_str());
 
     mfrc522.PICC_HaltA();
     mfrc522.PCD_StopCrypto1();
