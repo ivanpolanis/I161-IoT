@@ -18,7 +18,7 @@
                     "v": 4,
                     "tabs": [],
                     "primary": {
-                        "width": 300,
+                        "width": 589,
                         "top": {
                             "tabs": [
                                 "info",
@@ -26,9 +26,9 @@
                                 "config",
                                 "context"
                             ],
-                            "height": 305.594,
+                            "height": 309.594,
                             "hidden": false,
-                            "active": "config"
+                            "active": "info"
                         },
                         "bottom": {
                             "tabs": [
@@ -44,7 +44,7 @@
                             "tabs": [
                                 "explorer"
                             ],
-                            "height": 305.594,
+                            "height": 309.594,
                             "hidden": false,
                             "active": "explorer"
                         },
@@ -61,6 +61,7 @@
             "tours": {
                 "welcome": "5.0.0"
             }
-        }
+        },
+        "menu-menu-item-left-sidebar": true
     }
 }
