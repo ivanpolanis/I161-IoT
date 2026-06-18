@@ -5,6 +5,7 @@
 #include "event_queue.h"
 #include "mqtt_client.h"
 #include <ArduinoJson.h>
+#include <time.h>
 
 static bool     lockdownEnabled = false;
 static uint32_t defaultTtl      = DEFAULT_CACHE_TTL_S;
@@ -22,7 +23,14 @@ static void makeReqId(char* buf, size_t len) {
 }
 
 static void currentIso(char* buf, size_t len) {
-    snprintf(buf, len, "T+%lus", millis() / 1000);
+    time_t now = time(nullptr);
+    if (now > 1577836800UL) { // > 2020: NTP ya sincronizó
+        struct tm t;
+        gmtime_r(&now, &t);
+        strftime(buf, len, "%Y-%m-%dT%H:%M:%SZ", &t);
+    } else {
+        snprintf(buf, len, "T+%lus", millis() / 1000);
+    }
 }
 
 void initAccessLogic() {

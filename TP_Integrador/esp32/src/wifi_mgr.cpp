@@ -1,6 +1,8 @@
 #include "wifi_mgr.h"
+#include "config.h"
 #include <WiFiManager.h>
 #include <Arduino.h>
+#include <time.h>
 
 static WiFiManager wifiManager;
 
@@ -16,6 +18,10 @@ void initWifi() {
         ESP.restart();
     }
     Serial.printf("[WiFi] Conectado. IP: %s\n", WiFi.localIP().toString().c_str());
+
+    // Sincronización NTP en background — sin bloqueo
+    configTime(0, 0, NTP_SERVER1, NTP_SERVER2);
+    Serial.printf("[NTP] Sync iniciado (%s / %s)\n", NTP_SERVER1, NTP_SERVER2);
 }
 
 void handleWifi() {
