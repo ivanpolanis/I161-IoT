@@ -166,6 +166,7 @@ void onCommandConfig(const char* payload) {
 
     if (doc["cache_ttl_s"].is<uint32_t>()) {
         defaultTtl = doc["cache_ttl_s"].as<uint32_t>();
+        cacheUpdateAllTtl(defaultTtl);
         Serial.printf("[Logic] Nuevo TTL default = %us\n", defaultTtl);
     }
 }
