@@ -273,7 +273,7 @@
     "type": "function",
     "z": "tab-events",
     "name": "Formatear para InfluxDB",
-    "func": "// Format: [fields, tags] — measurement is set on the influxdb out node\nmsg.payload = [\n    { uid: msg.uid, count: 1 },\n    { device_id: msg.deviceId, outcome: msg.outcome, source: msg.source }\n];\nreturn msg;",
+    "func": "// Format: [fields, tags] — measurement is set on the influxdb out node\nmsg.payload = [\n    { count: 1 },\n    { device_id: msg.deviceId, uid: msg.uid, outcome: msg.outcome, source: msg.source }\n];\nreturn msg;",
     "outputs": 1,
     "x": 560,
     "y": 60,
