@@ -12,7 +12,6 @@
 #define PIN_RELAY      26
 #define PIN_LED_GREEN  25
 #define PIN_LED_RED    27
-// #define PIN_BUZZER  33   // Descomentar si hay buzzer
 
 // ─── Tiempos ──────────────────────────────────────────────────────────────────
 #define RELAY_OPEN_MS        3000    // Tiempo que el relé permanece abierto
