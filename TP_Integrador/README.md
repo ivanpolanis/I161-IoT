@@ -43,11 +43,11 @@ Alternativa sin instalar nada, usando el contenedor de Mosquitto (montando el di
 ```bash
 touch mosquitto/config/passwd
 docker run --rm -v "$PWD/mosquitto/config:/config" eclipse-mosquitto:2 \
-  mosquitto_passwd -b /config/passwd esp32 TU_PASS_ESP32
+  mosquitto_passwd -b /config/passwd esp32 changeme_esp32 
 docker run --rm -v "$PWD/mosquitto/config:/config" eclipse-mosquitto:2 \
-  mosquitto_passwd -b /config/passwd nodered TU_PASS_NODERED
+  mosquitto_passwd -b /config/passwd nodered changeme_nodered
 docker run --rm -v "$PWD/mosquitto/config:/config" eclipse-mosquitto:2 \
-  mosquitto_passwd -b /config/passwd admin TU_PASS_ADMIN
+  mosquitto_passwd -b /config/passwd admin changeme_admin
 ```
 
 ### 3. Obtener el Token del Bot de Telegram
