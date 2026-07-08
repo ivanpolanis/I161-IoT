@@ -5,14 +5,6 @@ TP Integrador — I161 IoT
 
 ## Arquitectura
 
-```
-ESP32 + RC522 ──MQTT auth──► Mosquitto ──► Node-RED
-                                              ├─ SQLite  (padrón usuarios)
-                                              ├─ InfluxDB (telemetría)
-                                              └─ Telegram Bot (admin)
-                                                       │
-                                                  Grafana (dashboards)
-```
 
 El ESP32 usa un **caché local** (LittleFS) como primera línea de verificación en cada lectura de tarjeta. Solo ante un cache miss consulta al servidor por MQTT. El servidor (Node-RED) es la única fuente de verdad y evalúa `enabled`, `expires_at` y `schedule` al responder.
 
@@ -32,28 +24,30 @@ El ESP32 usa un **caché local** (LittleFS) como primera línea de verificación
 cp .env.example .env
 ```
 
-Editar `.env` con contraseñas reales para Mosquitto, el token del bot de Telegram y los IDs de chat de admins.
+Editar `.env` con contraseñas reales para Mosquitto (`MOSQ_*`), el token del bot de Telegram, los IDs de chat de admins y, opcionalmente, `NODE_RED_CREDENTIAL_SECRET` y las credenciales de Grafana. **Las contraseñas de Mosquitto en `.env` deben coincidir con las que uses en el paso siguiente.**
 
 ### 2. Generar el archivo de contraseñas de Mosquitto
 
-El archivo `mosquitto/config/passwd` se genera con `mosquitto_passwd` (no se commitea):
+El archivo `mosquitto/config/passwd` se genera con `mosquitto_passwd`, creando un usuario por cada cuenta (`esp32`, `nodered`, `admin`) con las mismas contraseñas que pusiste en `.env`.
+
+Con `mosquitto_passwd` instalado localmente:
 
 ```bash
-# Crear archivo nuevo con el usuario esp32
-docker run --rm -it eclipse-mosquitto:2 mosquitto_passwd -c /dev/stdout esp32
-# Pegar el hash en mosquitto/config/passwd
-
-# Agregar usuarios nodered y admin (sin -c para no sobrescribir)
-docker run --rm -it eclipse-mosquitto:2 mosquitto_passwd -b /dev/stdout nodered TU_PASS_NODERED
-docker run --rm -it eclipse-mosquitto:2 mosquitto_passwd -b /dev/stdout admin TU_PASS_ADMIN
-```
-
-Alternativa con mosquitto_passwd instalado localmente:
-
-```bash
-mosquitto_passwd -c mosquitto/config/passwd esp32
+mosquitto_passwd -c mosquitto/config/passwd esp32     # -c crea el archivo (primera vez)
 mosquitto_passwd mosquitto/config/passwd nodered
 mosquitto_passwd mosquitto/config/passwd admin
+```
+
+Alternativa sin instalar nada, usando el contenedor de Mosquitto (montando el directorio de config; `-b` toma la contraseña en la misma línea). Se crea el archivo con `touch` primero y **solo se usa modo append** (no `-c`): si `mosquitto_passwd -c` corre dentro del contenedor, deja el archivo como `root:root 0600` y el broker no puede leerlo:
+
+```bash
+touch mosquitto/config/passwd
+docker run --rm -v "$PWD/mosquitto/config:/config" eclipse-mosquitto:2 \
+  mosquitto_passwd -b /config/passwd esp32 TU_PASS_ESP32
+docker run --rm -v "$PWD/mosquitto/config:/config" eclipse-mosquitto:2 \
+  mosquitto_passwd -b /config/passwd nodered TU_PASS_NODERED
+docker run --rm -v "$PWD/mosquitto/config:/config" eclipse-mosquitto:2 \
+  mosquitto_passwd -b /config/passwd admin TU_PASS_ADMIN
 ```
 
 ### 3. Obtener el Token del Bot de Telegram
@@ -82,18 +76,6 @@ Servicios disponibles:
 - **InfluxDB**: `http://localhost:8086`
 - **Grafana**: `http://localhost:3000` (admin/admin por defecto)
 
-### 5. Verificar MQTT (diagnóstico)
-
-```bash
-# Suscribirse a todos los topics de acceso
-mosquitto_sub -h localhost -p 1883 -u admin -P TU_PASS_ADMIN -t 'access/#' -v
-
-# En otra terminal, publicar un evento de prueba
-mosquitto_pub -h localhost -p 1883 -u admin -P TU_PASS_ADMIN \
-  -t 'access/door01/event' \
-  -m '{"uid":"AABBCCDD","outcome":"granted","source":"test","ts":"2025-01-01T00:00:00Z"}'
-```
-
 ---
 
 ## Setup del firmware ESP32
@@ -110,21 +92,20 @@ Editar `esp32/src/config.h`:
 
 ### 2. Build y upload
 
-```bash
-cd esp32
+Desde la interfaz de PlatformIO en VS Code:
 
-# Compilar
-pio run
+![Interfaz de PlatformIO en VS Code](assets/platformio.png)
 
-# Subir filesystem LittleFS (vacío al inicio)
-pio run -t uploadfs
+General:
+ - Seleccionar el entorno `esp32dev`
+ - Clic en `Build`
+ - Clic en `Upload`
 
-# Subir firmware
-pio run -t upload
+Platform
+ - Seleccionar el entorno `esp32dev`
+ - Clic en `Build FileSystemImage`
+ - Clic en `Upload FileSystemImage`
 
-# Monitor serial
-pio device monitor
-```
 
 ### 3. Provisioning WiFi
 
@@ -178,63 +159,3 @@ Permite acceso de lunes (1) a viernes (5) entre las 08:00 y las 18:00.
 | `access/door01/status` | ESP32 → Server (retained) | Heartbeat y Last Will (offline detection) |
 
 ---
-
-## Flujo de decisión del ESP32
-
-```
-Leer tarjeta RFID
-        │
-        ▼
-¿Lockdown activo? ──sí──► Denegar + encolar evento
-        │ no
-        ▼
-¿UID en caché y no expirado? ──sí──► Abrir relé + encolar evento (source: cache)
-        │ no
-        ▼
-¿MQTT conectado? ──no──► Denegar + encolar evento (source: offline_miss)
-        │ sí
-        ▼
-Publicar request → esperar response (timeout 1.5s)
-        │
-   ┌────┴────┐
-  sí       no/timeout
-   │           │
-Abrir +    Denegar +
-encolar    encolar
-(source:   (source:
-server)    server_timeout)
-```
-
----
-
-## Estructura del proyecto
-
-```
-TP_Integrador/
-├── docker-compose.yml
-├── .env.example
-├── .gitignore
-├── mosquitto/
-│   └── config/         mosquitto.conf, acl, passwd (no en repo)
-├── nodered/
-│   ├── Dockerfile
-│   ├── data/
-│   │   ├── flows.json  5 tabs: Init, CacheMiss, Events, Status, Telegram
-│   │   └── package.json
-│   └── scripts/schema.sql
-├── grafana/
-│   ├── provisioning/   datasources + dashboards
-│   └── dashboards/accesos.json
-└── esp32/
-    ├── platformio.ini
-    └── src/
-        ├── main.cpp
-        ├── config.example.h  (copiar a config.h y completar)
-        ├── wifi_mgr.h/.cpp
-        ├── mqtt_client.h/.cpp
-        ├── rfid_reader.h/.cpp
-        ├── access_cache.h/.cpp  (LittleFS, TTL configurable)
-        ├── event_queue.h/.cpp   (cola offline persistente)
-        ├── actuators.h/.cpp     (relé, LEDs)
-        └── access_logic.h/.cpp  (FSM principal)
-```
