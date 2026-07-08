@@ -35,6 +35,10 @@
 #define TOPIC_CMD_CFG   "access/" DEVICE_ID "/command/config"
 #define TOPIC_STATUS    "access/" DEVICE_ID "/status"
 
+// ─── NTP ──────────────────────────────────────────────────────────────────────
+#define NTP_SERVER1  "pool.ntp.org"
+#define NTP_SERVER2  "time.nist.gov"
+
 // ─── Almacenamiento LittleFS ──────────────────────────────────────────────────
 #define CACHE_FILE        "/cache.json"
 #define QUEUE_FILE        "/queue.json"
