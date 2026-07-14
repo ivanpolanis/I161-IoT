@@ -1,902 +1,902 @@
 [
-  {
-    "id": "tab-init",
-    "type": "tab",
-    "label": "Init & Schema",
-    "disabled": false
-  },
-  {
-    "id": "tab-cache-miss",
-    "type": "tab",
-    "label": "Cache Miss Handler",
-    "disabled": false
-  },
-  {
-    "id": "tab-events",
-    "type": "tab",
-    "label": "Event Recorder",
-    "disabled": false
-  },
-  {
-    "id": "tab-status",
-    "type": "tab",
-    "label": "Status Monitor",
-    "disabled": false
-  },
-  {
-    "id": "tab-telegram",
-    "type": "tab",
-    "label": "Telegram Bot",
-    "disabled": false
-  },
-  {
-    "id": "config-mqtt",
-    "type": "mqtt-broker",
-    "name": "Mosquitto",
-    "broker": "mosquitto",
-    "port": "1883",
-    "clientid": "nodered-access-ctrl",
-    "autoConnect": true,
-    "usetls": false,
-    "protocolVersion": "4",
-    "keepalive": "30",
-    "cleansession": true
-  },
-  {
-    "id": "config-influxdb",
-    "type": "influxdb",
-    "hostname": "influxdb",
-    "port": "8086",
-    "protocol": "http",
-    "database": "iot",
-    "name": "InfluxDB",
-    "usetls": false,
-    "influxdbVersion": "1.x",
-    "url": "http://influxdb:8086",
-    "rejectUnauthorized": true
-  },
-  {
-    "id": "config-sqlite",
-    "type": "sqlitedb",
-    "db": "/data/sqlite/access.db",
-    "mode": "RWC"
-  },
-  {
-    "id": "config-telegram",
-    "type": "telegram bot",
-    "botname": "AccessControlBot",
-    "usernames": "",
-    "chatids": "",
-    "baseapiurl": "",
-    "testenvironment": false,
-    "updatemode": "polling",
-    "addressfamily": "4",
-    "pollinterval": "300",
-    "usesocks": false,
-    "sockshost": "",
-    "socksport": "",
-    "socksusername": "",
-    "sockspassword": "",
-    "bothost": "",
-    "botpath": "",
-    "localbothost": "",
-    "localbotport": "",
-    "publicbotport": "",
-    "privatekey": "",
-    "certificate": "",
-    "useselfsignedcertificate": false,
-    "sslterminated": false,
-    "verboselogging": false
-  },
-  {
-    "id": "inject-init",
-    "type": "inject",
-    "z": "tab-init",
-    "name": "Aplicar schema al arrancar",
-    "repeat": "",
-    "once": true,
-    "onceDelay": "2",
-    "payload": "",
-    "payloadType": "date",
-    "x": 160,
-    "y": 80,
-    "wires": [
-      [
-        "fn-read-schema"
-      ]
-    ]
-  },
-  {
-    "id": "fn-read-schema",
-    "type": "function",
-    "z": "tab-init",
-    "name": "Cargar SQL schema",
-    "func": "msg.topic = `\nCREATE TABLE IF NOT EXISTS users (\n    uid        TEXT PRIMARY KEY,\n    name       TEXT NOT NULL,\n    schedule   TEXT DEFAULT NULL,\n    expires_at TEXT DEFAULT NULL,\n    enabled    INTEGER NOT NULL DEFAULT 1,\n    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),\n    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))\n);\nCREATE TABLE IF NOT EXISTS audit (\n    id         INTEGER PRIMARY KEY AUTOINCREMENT,\n    ts         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),\n    actor      TEXT NOT NULL,\n    action     TEXT NOT NULL,\n    target_uid TEXT,\n    details    TEXT\n);\nCREATE INDEX IF NOT EXISTS idx_audit_ts  ON audit(ts DESC);\nCREATE INDEX IF NOT EXISTS idx_audit_uid ON audit(target_uid);\n`;\nreturn msg;",
-    "outputs": 1,
-    "x": 380,
-    "y": 80,
-    "wires": [
-      [
-        "sqlite-init"
-      ]
-    ]
-  },
-  {
-    "id": "sqlite-init",
-    "type": "sqlite",
-    "z": "tab-init",
-    "mydb": "config-sqlite",
-    "sqlquery": "batch",
-    "name": "Crear tablas",
-    "x": 600,
-    "y": 80,
-    "wires": [
-      [
-        "debug-init"
-      ]
-    ]
-  },
-  {
-    "id": "debug-init",
-    "type": "debug",
-    "z": "tab-init",
-    "name": "Schema OK",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": false,
-    "complete": "true",
-    "targetType": "full",
-    "statusVal": "",
-    "statusType": "auto",
-    "x": 800,
-    "y": 80,
-    "wires": []
-  },
-  {
-    "id": "mqtt-request",
-    "type": "mqtt in",
-    "z": "tab-cache-miss",
-    "name": "access/+/request",
-    "topic": "access/+/request",
-    "qos": "1",
-    "datatype": "json",
-    "broker": "config-mqtt",
-    "inputs": 0,
-    "x": 120,
-    "y": 100,
-    "wires": [
-      [
-        "fn-parse-request"
-      ]
-    ]
-  },
-  {
-    "id": "fn-parse-request",
-    "type": "function",
-    "z": "tab-cache-miss",
-    "name": "Extraer device_id y uid",
-    "func": "const parts = msg.topic.split('/');\nconst deviceId = parts[1];\nconst {uid, req_id} = msg.payload;\nif (!uid || !req_id) { node.warn('Request malformado: ' + JSON.stringify(msg.payload)); return null; }\nmsg.deviceId = deviceId;\nmsg.uid = uid.toUpperCase();\nmsg.req_id = req_id;\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg.topic = \"SELECT uid, name, schedule, expires_at, enabled FROM users WHERE uid = '\" + esc(msg.uid) + \"'\";\nreturn msg;",
-    "outputs": 1,
-    "x": 340,
-    "y": 100,
-    "wires": [
-      [
-        "sqlite-lookup"
-      ]
-    ]
-  },
-  {
-    "id": "sqlite-lookup",
-    "type": "sqlite",
-    "z": "tab-cache-miss",
-    "mydb": "config-sqlite",
-    "sqlquery": "msg.topic",
-    "name": "Buscar usuario",
-    "x": 560,
-    "y": 100,
-    "wires": [
-      [
-        "fn-decide-access"
-      ]
-    ]
-  },
-  {
-    "id": "fn-decide-access",
-    "type": "function",
-    "z": "tab-cache-miss",
-    "name": "Evaluar acceso",
-    "func": "const lockdown   = flow.get('lockdown') || false;\nconst defaultTtl = flow.get('cache_ttl_s') || 86400;\nconst {uid, deviceId, req_id} = msg;\nconst rows = msg.payload;\n\nlet allowed = false;\nlet reason  = '';\nlet ttl     = defaultTtl;\n\nif (lockdown) {\n    reason = 'lockdown';\n} else if (!rows || rows.length === 0) {\n    reason = 'user_not_found';\n} else {\n    const u = rows[0];\n    if (!u.enabled) {\n        reason = 'disabled';\n    } else if (u.expires_at && new Date(u.expires_at) < new Date()) {\n        reason = 'expired';\n    } else if (u.schedule) {\n        const sched = JSON.parse(u.schedule);\n        const now = new Date();\n        const day = now.getDay();\n        const hhmm = now.getHours() * 60 + now.getMinutes();\n        const [fH, fM] = sched.from.split(':').map(Number);\n        const [tH, tM] = sched.to.split(':').map(Number);\n        const fromMin = fH * 60 + fM;\n        const toMin   = tH * 60 + tM;\n        if (!sched.days.includes(day) || hhmm < fromMin || hhmm >= toMin) {\n            reason = 'out_of_schedule';\n        } else {\n            allowed = true;\n            ttl = Math.min(defaultTtl, (toMin - hhmm) * 60);\n        }\n    } else {\n        allowed = true;\n        if (u.expires_at) {\n            ttl = Math.min(defaultTtl, Math.floor((new Date(u.expires_at) - new Date()) / 1000));\n        }\n    }\n}\n\nconst response = {req_id, uid, allowed};\nif (allowed) response.ttl = ttl;\n\nnode.log(`[${deviceId}] UID=${uid} allowed=${allowed} reason=${reason || 'ok'}`);\nmsg.topic   = `access/${deviceId}/response`;\nmsg.payload = response;\nmsg.qos     = 1;\nmsg.retain  = false;\nreturn msg;",
-    "outputs": 1,
-    "x": 780,
-    "y": 100,
-    "wires": [
-      [
-        "mqtt-response"
-      ]
-    ]
-  },
-  {
-    "id": "mqtt-response",
-    "type": "mqtt out",
-    "z": "tab-cache-miss",
-    "name": "Publicar respuesta",
-    "topic": "",
-    "qos": "1",
-    "retain": false,
-    "broker": "config-mqtt",
-    "x": 1010,
-    "y": 100,
-    "wires": []
-  },
-  {
-    "id": "mqtt-events",
-    "type": "mqtt in",
-    "z": "tab-events",
-    "name": "access/+/event",
-    "topic": "access/+/event",
-    "qos": "1",
-    "datatype": "json",
-    "broker": "config-mqtt",
-    "inputs": 0,
-    "x": 120,
-    "y": 120,
-    "wires": [
-      [
-        "fn-parse-event"
-      ]
-    ]
-  },
-  {
-    "id": "fn-parse-event",
-    "type": "function",
-    "z": "tab-events",
-    "name": "Parsear y distribuir",
-    "func": "const parts = msg.topic.split('/');\nconst deviceId = parts[1];\nconst {uid, outcome, source, ts} = msg.payload;\nif (!uid || !outcome) { node.warn('Evento malformado: ' + JSON.stringify(msg.payload)); return [null,null,null]; }\nmsg.deviceId = deviceId;\nmsg.uid      = uid.toUpperCase();\nmsg.outcome  = outcome;\nmsg.source   = source || 'unknown';\nmsg.eventTs  = ts || new Date().toISOString();\n// Salida 0: InfluxDB, Salida 1: SQLite audit, Salida 2: alerta denied\nreturn [msg, msg, outcome === 'denied' ? msg : null];",
-    "outputs": 3,
-    "x": 340,
-    "y": 120,
-    "wires": [
-      [
-        "fn-influx-format"
-      ],
-      [
-        "fn-sqlite-audit-event"
-      ],
-      [
-        "fn-denied-alert"
-      ]
-    ]
-  },
-  {
-    "id": "fn-influx-format",
-    "type": "function",
-    "z": "tab-events",
-    "name": "Formatear para InfluxDB",
-    "func": "// Format: [fields, tags] — measurement is set on the influxdb out node\nmsg.payload = [\n    { count: 1 },\n    { device_id: msg.deviceId, uid: msg.uid, outcome: msg.outcome, source: msg.source }\n];\nreturn msg;",
-    "outputs": 1,
-    "x": 560,
-    "y": 60,
-    "wires": [
-      [
-        "influx-out-events"
-      ]
-    ]
-  },
-  {
-    "id": "influx-out-events",
-    "type": "influxdb out",
-    "z": "tab-events",
-    "influxdb": "config-influxdb",
-    "name": "InfluxDB access_events",
-    "measurement": "access_events",
-    "precision": "ms",
-    "database": "iot",
-    "x": 800,
-    "y": 60,
-    "wires": []
-  },
-  {
-    "id": "fn-sqlite-audit-event",
-    "type": "function",
-    "z": "tab-events",
-    "name": "Preparar INSERT audit",
-    "func": "const esc = s => String(s||'').replace(/'/g, \"''\");\nconst details = JSON.stringify({source: msg.source, ts: msg.eventTs});\nmsg.topic = \"INSERT INTO audit (actor, action, target_uid, details) VALUES ('\" + esc(msg.deviceId) + \"', 'access_\" + esc(msg.outcome) + \"', '\" + esc(msg.uid) + \"', '\" + esc(details) + \"')\";\nreturn msg;",
-    "outputs": 1,
-    "x": 580,
-    "y": 120,
-    "wires": [
-      [
-        "sqlite-audit-events"
-      ]
-    ]
-  },
-  {
-    "id": "sqlite-audit-events",
-    "type": "sqlite",
-    "z": "tab-events",
-    "mydb": "config-sqlite",
-    "sqlquery": "msg.topic",
-    "name": "Escribir audit",
-    "x": 800,
-    "y": 120,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "fn-denied-alert",
-    "type": "function",
-    "z": "tab-events",
-    "name": "Armar alerta denegado",
-    "func": "const ids = (env.get('TELEGRAM_ADMIN_IDS') || '').split(',').map(s => s.trim()).filter(Boolean);\nif (!ids.length) return null;\nmsg.payload = {\n    chatId:  parseInt(ids[0]),\n    type:    'message',\n    content: `⛔ Acceso DENEGADO\\nDispositivo: ${msg.deviceId}\\nUID: ${msg.uid}\\nMotivo: ${msg.source}\\nHora: ${msg.eventTs}`\n};\nreturn msg;",
-    "outputs": 1,
-    "x": 580,
-    "y": 180,
-    "wires": [
-      [
-        "telegram-send-events"
-      ]
-    ]
-  },
-  {
-    "id": "telegram-send-events",
-    "type": "telegram sender",
-    "z": "tab-events",
-    "name": "Enviar alerta",
-    "bot": "config-telegram",
-    "outputs": 1,
-    "x": 800,
-    "y": 180,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "mqtt-status",
-    "type": "mqtt in",
-    "z": "tab-status",
-    "name": "access/+/status",
-    "topic": "access/+/status",
-    "qos": "1",
-    "datatype": "json",
-    "broker": "config-mqtt",
-    "inputs": 0,
-    "x": 120,
-    "y": 100,
-    "wires": [
-      [
-        "fn-check-status"
-      ]
-    ]
-  },
-  {
-    "id": "fn-check-status",
-    "type": "function",
-    "z": "tab-status",
-    "name": "Detectar dispositivo offline",
-    "func": "const deviceId = msg.topic.split('/')[1];\nconst {online} = msg.payload;\nif (online !== false) return null;\nconst ids = (env.get('TELEGRAM_ADMIN_IDS') || '').split(',').map(s => s.trim()).filter(Boolean);\nif (!ids.length) return null;\nmsg.payload = {\n    chatId:  parseInt(ids[0]),\n    type:    'message',\n    content: `🔴 DISPOSITIVO OFFLINE\\nID: ${deviceId}\\nHora: ${new Date().toISOString()}`\n};\nreturn msg;",
-    "outputs": 1,
-    "x": 360,
-    "y": 100,
-    "wires": [
-      [
-        "telegram-send-status"
-      ]
-    ]
-  },
-  {
-    "id": "telegram-send-status",
-    "type": "telegram sender",
-    "z": "tab-status",
-    "name": "Notificar offline",
-    "bot": "config-telegram",
-    "outputs": 1,
-    "x": 600,
-    "y": 100,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "telegram-receiver",
-    "type": "telegram receiver",
-    "z": "tab-telegram",
-    "name": "Recibir comandos",
-    "bot": "config-telegram",
-    "saveDataDir": "",
-    "filterCommands": true,
-    "hasinput": false,
-    "inputs": 0,
-    "handleallupdates": false,
-    "handleprocessupdates": false,
-    "x": 130,
-    "y": 80,
-    "wires": [
-      [
-        "fn-auth-check"
-      ],
-      []
-    ]
-  },
-  {
-    "id": "fn-auth-check",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "Verificar admin",
-    "func": "const ids = (env.get('TELEGRAM_ADMIN_IDS') || '').split(',').map(s => s.trim());\nconst chatId = String(msg.payload.chatId);\nif (!ids.includes(chatId)) {\n    node.warn('No autorizado chatId: ' + chatId);\n    node.send([null, {payload:{chatId:msg.payload.chatId,type:'message',content:'⛔ No autorizado.'}}]);\n    return null;\n}\nreturn [msg, null];",
-    "outputs": 2,
-    "timeout": "",
-    "noerr": 0,
-    "initialize": "",
-    "finalize": "",
-    "libs": [],
-    "x": 330,
-    "y": 80,
-    "wires": [
-      [
-        "fn-setup-ctx"
-      ],
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "fn-setup-ctx",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "Preparar contexto del mensaje",
-    "func": "const text = (msg.payload.content || '').trim();\nconst parts = text.split(/\\s+/);\nmsg._cmd    = parts[0].toLowerCase();\nmsg._parts  = parts;\nmsg._chatId = msg.payload.chatId;\nmsg._actor  = (msg.payload.from && msg.payload.from.username) ? msg.payload.from.username : String(msg.payload.chatId);\nreturn msg;",
-    "outputs": 1,
-    "x": 530,
-    "y": 80,
-    "wires": [
-      [
-        "fn-router"
-      ]
-    ]
-  },
-  {
-    "id": "fn-router",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "Router de comandos",
-    "func": "const routes = {'/alta':0,'/baja':1,'/habilitar':2,'/deshabilitar':3,'/horario':4,'/expira':5,'/usuario':6,'/ultimos':7,'/lockdown':8,'/ttl':9,'/ayuda':10,'/usuarios':11};\nconst idx = routes[msg._cmd];\nif (idx === undefined) {\n    node.send(Array(13).fill(null).map((_,i) => i===12 ? {payload:{chatId:msg._chatId,type:'message',content:'Comando desconocido. Usá /ayuda.'}} : null));\n    return null;\n}\nconst out = Array(13).fill(null);\nout[idx] = msg;\nreturn out;",
-    "outputs": 13,
-    "timeout": "",
-    "noerr": 0,
-    "initialize": "",
-    "finalize": "",
-    "libs": [],
-    "x": 740,
-    "y": 80,
-    "wires": [
-      [
-        "fn-alta"
-      ],
-      [
-        "fn-baja"
-      ],
-      [
-        "fn-habilitar"
-      ],
-      [
-        "fn-deshabilitar"
-      ],
-      [
-        "fn-horario"
-      ],
-      [
-        "fn-expira"
-      ],
-      [
-        "fn-usuario"
-      ],
-      [
-        "fn-ultimos"
-      ],
-      [
-        "fn-lockdown"
-      ],
-      [
-        "fn-ttl"
-      ],
-      [
-        "fn-ayuda"
-      ],
-      [
-        "fn-usuarios"
-      ],
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "fn-alta",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "/alta",
-    "func": "const [,uid,...rest] = msg._parts;\nif (!uid || !rest.length) { node.send([null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /alta <uid> <nombre>'}}]); return null; }\nconst name = rest.join(' ');\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg._uid = uid.toUpperCase(); msg._name = name; msg._action = 'create'; msg._details = JSON.stringify({name});\nmsg.topic = \"INSERT INTO users (uid, name) VALUES ('\" + esc(msg._uid) + \"', '\" + esc(name) + \"') ON CONFLICT(uid) DO UPDATE SET name=excluded.name, enabled=1, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')\";\nreturn [msg, null];",
-    "outputs": 2,
-    "x": 980,
-    "y": 20,
-    "wires": [
-      [
-        "sqlite-cmd-exec"
-      ],
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "fn-baja",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "/baja",
-    "func": "const [,uid] = msg._parts;\nif (!uid) { node.send([null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /baja <uid>'}}]); return null; }\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg._uid = uid.toUpperCase(); msg._action = 'disable'; msg._details = null;\nmsg.topic = \"UPDATE users SET enabled=0, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE uid='\" + esc(msg._uid) + \"'\";\nreturn [msg, null];",
-    "outputs": 2,
-    "x": 980,
-    "y": 70,
-    "wires": [
-      [
-        "sqlite-cmd-exec"
-      ],
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "fn-habilitar",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "/habilitar",
-    "func": "const [,uid] = msg._parts;\nif (!uid) { node.send([null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /habilitar <uid>'}}]); return null; }\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg._uid = uid.toUpperCase(); msg._action = 'enable'; msg._details = null;\nmsg.topic = \"UPDATE users SET enabled=1, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE uid='\" + esc(msg._uid) + \"'\";\nreturn [msg, null];",
-    "outputs": 2,
-    "x": 980,
-    "y": 120,
-    "wires": [
-      [
-        "sqlite-cmd-exec"
-      ],
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "fn-deshabilitar",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "/deshabilitar",
-    "func": "const [,uid] = msg._parts;\nif (!uid) { node.send([null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /deshabilitar <uid>'}}]); return null; }\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg._uid = uid.toUpperCase(); msg._action = 'disable'; msg._details = null;\nmsg.topic = \"UPDATE users SET enabled=0, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE uid='\" + esc(msg._uid) + \"'\";\nreturn [msg, null];",
-    "outputs": 2,
-    "x": 980,
-    "y": 170,
-    "wires": [
-      [
-        "sqlite-cmd-exec"
-      ],
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "fn-horario",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "/horario",
-    "func": "// /horario <uid> <dias_csv> <HH:MM> <HH:MM>\nconst [,uid,diasStr,desde,hasta] = msg._parts;\nif (!uid||!diasStr||!desde||!hasta) { node.send([null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /horario <uid> <dias_csv> <HH:MM> <HH:MM>\\nEj: /horario AABB1234 1,2,3,4,5 08:00 18:00'}}]); return null; }\nconst schedule = JSON.stringify({days: diasStr.split(',').map(Number), from: desde, to: hasta});\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg._uid = uid.toUpperCase(); msg._action = 'set_schedule'; msg._details = schedule;\nmsg.topic = \"UPDATE users SET schedule='\" + esc(schedule) + \"', updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE uid='\" + esc(msg._uid) + \"'\";\nreturn [msg, null];",
-    "outputs": 2,
-    "x": 980,
-    "y": 220,
-    "wires": [
-      [
-        "sqlite-cmd-exec"
-      ],
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "fn-expira",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "/expira",
-    "func": "// /expira <uid> <ISO8601|none>\nconst [,uid,fecha] = msg._parts;\nif (!uid||!fecha) { node.send([null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /expira <uid> <ISO8601|none>'}}]); return null; }\nconst expiresAt = fecha.toLowerCase()==='none' ? null : fecha;\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg._uid = uid.toUpperCase(); msg._action = 'set_expiry'; msg._details = JSON.stringify({expires_at: expiresAt});\nconst expiresVal = expiresAt === null ? 'NULL' : \"'\" + esc(expiresAt) + \"'\";\nmsg.topic = \"UPDATE users SET expires_at=\" + expiresVal + \", updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE uid='\" + esc(msg._uid) + \"'\";\nreturn [msg, null];",
-    "outputs": 2,
-    "x": 980,
-    "y": 270,
-    "wires": [
-      [
-        "sqlite-cmd-exec"
-      ],
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "sqlite-cmd-exec",
-    "type": "sqlite",
-    "z": "tab-telegram",
-    "mydb": "config-sqlite",
-    "sqlquery": "msg.topic",
-    "name": "Ejecutar SQL",
-    "x": 1200,
-    "y": 145,
-    "wires": [
-      [
-        "fn-post-write"
-      ]
-    ]
-  },
-  {
-    "id": "fn-post-write",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "Post-write: audit + invalidar + reply",
-    "func": "const {_uid:uid, _action:action, _actor:actor, _details:details, _chatId:chatId, _name:name} = msg;\nconst esc = s => String(s||'').replace(/'/g, \"''\");\n\n// 1) Audit\nconst am = {topic:\"INSERT INTO audit (actor,action,target_uid,details) VALUES ('\" + esc(actor) + \"','\" + esc(action) + \"','\" + esc(uid) + \"','\" + esc(details) + \"')\"};\n// 2) Invalidar cache en ESP32\nconst im = {topic:'access/door01/command/invalidate', payload:JSON.stringify({uid}), qos:1, retain:false};\n// 3) Reply Telegram\nconst icons = {create:'✅',enable:'✅',disable:'❌',set_schedule:'📅',set_expiry:'⏱️'};\nconst icon  = icons[action] || 'ℹ️';\nconst label = name ? ` (${name})` : '';\nconst rm = {payload:{chatId, type:'message', content:`${icon} \\`${action}\\` aplicado sobre UID \\`${uid}\\`${label}.`, options:{parse_mode:'Markdown'}}};\n\nnode.send([am, im, rm]);\nreturn null;",
-    "outputs": 3,
-    "x": 1420,
-    "y": 145,
-    "wires": [
-      [
-        "sqlite-audit-bot"
-      ],
-      [
-        "mqtt-cmd-out"
-      ],
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "fn-usuario",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "/usuario",
-    "func": "const [,uid] = msg._parts;\nif (!uid) { node.send([{payload:{chatId:msg._chatId,type:'message',content:'Uso: /usuario <uid>'}}]); return null; }\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg.topic = \"SELECT uid,name,schedule,expires_at,enabled,created_at FROM users WHERE uid='\" + esc(uid.toUpperCase()) + \"'\";\nreturn msg;",
-    "outputs": 1,
-    "x": 980,
-    "y": 360,
-    "wires": [
-      [
-        "sqlite-query-user"
-      ]
-    ]
-  },
-  {
-    "id": "sqlite-query-user",
-    "type": "sqlite",
-    "z": "tab-telegram",
-    "mydb": "config-sqlite",
-    "sqlquery": "msg.topic",
-    "name": "SELECT user",
-    "x": 1180,
-    "y": 360,
-    "wires": [
-      [
-        "fn-format-user"
-      ]
-    ]
-  },
-  {
-    "id": "fn-format-user",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "Formatear usuario",
-    "func": "const rows = msg.payload;\nlet text;\nif (!rows||!rows.length) {\n    text = '❌ Usuario no encontrado.';\n} else {\n    const u = rows[0];\n    text = `👤 *Usuario*\\nUID: \\`${u.uid}\\`\\nNombre: ${u.name}\\nEstado: ${u.enabled?'✅ Habilitado':'❌ Deshabilitado'}\\nHorario: ${u.schedule||'Sin restricción'}\\nExpira: ${u.expires_at||'No expira'}\\nAlta: ${u.created_at}`;\n}\nmsg.payload = {chatId:msg._chatId, type:'message', content:text, options:{parse_mode:'Markdown'}};\nreturn msg;",
-    "outputs": 1,
-    "timeout": "",
-    "noerr": 0,
-    "initialize": "",
-    "finalize": "",
-    "libs": [],
-    "x": 1380,
-    "y": 360,
-    "wires": [
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "fn-ultimos",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "/ultimos",
-    "func": "const n = Math.min(parseInt(msg._parts[1])||10, 50);\nmsg.topic = `SELECT a.ts, a.target_uid, a.action, a.actor, u.name FROM audit a LEFT JOIN users u ON u.uid = a.target_uid WHERE a.action LIKE 'access_%' ORDER BY a.ts DESC LIMIT ${n}`;\nreturn msg;",
-    "outputs": 1,
-    "timeout": "",
-    "noerr": 0,
-    "initialize": "",
-    "finalize": "",
-    "libs": [],
-    "x": 980,
-    "y": 420,
-    "wires": [
-      [
-        "sqlite-query-ultimos"
-      ]
-    ]
-  },
-  {
-    "id": "sqlite-query-ultimos",
-    "type": "sqlite",
-    "z": "tab-telegram",
-    "mydb": "config-sqlite",
-    "sqlquery": "msg.topic",
-    "sql": "",
-    "name": "SELECT últimos",
-    "x": 1180,
-    "y": 420,
-    "wires": [
-      [
-        "fn-format-ultimos"
-      ]
-    ]
-  },
-  {
-    "id": "fn-format-ultimos",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "Formatear últimos",
-    "func": "const rows = msg.payload;\nif (!rows||!rows.length) {\n    msg.payload = {chatId:msg._chatId, type:'message', content:'No hay eventos registrados.'};\n} else {\n    const lines = rows.map(r => {\n        const ok = r.action.replace('access_','') === 'granted';\n        const who = r.name ? `${r.name} (${r.target_uid})` : (r.target_uid || 'desconocido');\n        return `${ok?'✅':'❌'} ${r.ts.slice(0,19)} | ${who} | ${r.actor}`;\n    });\n    msg.payload = {chatId:msg._chatId, type:'message', content:`*Últimos ${rows.length} eventos:*\\n\\`\\`\\`\\n${lines.join('\\n')}\\n\\`\\`\\``, options:{parse_mode:'Markdown'}};\n}\nreturn msg;",
-    "outputs": 1,
-    "x": 1380,
-    "y": 420,
-    "wires": [
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "fn-lockdown",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "/lockdown",
-    "func": "const [,state] = msg._parts;\nif (state!=='on'&&state!=='off') { node.send([null,null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /lockdown on|off'}}]); return null; }\nconst enabled = state==='on';\nflow.set('lockdown', enabled);\nconst im = {topic:'access/door01/command/lockdown', payload:JSON.stringify({enabled}), qos:1, retain:true};\nconst am = {topic:\"INSERT INTO audit (actor,action,target_uid,details) VALUES (?,?,NULL,NULL)\", params:[msg._actor, enabled?'lockdown_on':'lockdown_off']};\nconst rm = {payload:{chatId:msg._chatId, type:'message', content:`${enabled?'🔒 LOCKDOWN ACTIVADO — todas las tarjetas serán denegadas.':'🔓 Lockdown desactivado.'}`}};\nnode.send([im, am, rm]);\nreturn null;",
-    "outputs": 3,
-    "x": 980,
-    "y": 490,
-    "wires": [
-      [
-        "mqtt-cmd-out"
-      ],
-      [
-        "sqlite-audit-bot"
-      ],
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "fn-ttl",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "/ttl",
-    "func": "const secs = parseInt(msg._parts[1]);\nif (!secs||secs<60||secs>2592000) { node.send([null,null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /ttl <segundos> (60 a 2592000)'}}]); return null; }\nflow.set('cache_ttl_s', secs);\nconst im = {topic:'access/door01/command/config', payload:JSON.stringify({cache_ttl_s:secs}), qos:1, retain:false};\nconst am = {topic:\"INSERT INTO audit (actor,action,target_uid,details) VALUES (?,?,NULL,?)\", params:[msg._actor,'set_ttl',JSON.stringify({ttl:secs})]};\nconst rm = {payload:{chatId:msg._chatId, type:'message', content:`⚙️ TTL actualizado a ${secs}s (${(secs/3600).toFixed(1)}h).`}};\nnode.send([im, am, rm]);\nreturn null;",
-    "outputs": 3,
-    "x": 980,
-    "y": 550,
-    "wires": [
-      [
-        "mqtt-cmd-out"
-      ],
-      [
-        "sqlite-audit-bot"
-      ],
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "fn-ayuda",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "/ayuda",
-    "func": "msg.payload = {chatId:msg._chatId, type:'message', options:{parse_mode:'Markdown'}, content:`🔐 *Control de Acceso RFID*\\n\\n*Usuarios:*\\n/alta <uid> <nombre>\\n/baja <uid>\\n/habilitar <uid>\\n/deshabilitar <uid>\\n/usuario <uid>\\n/usuarios\\n/horario <uid> <dias> <desde> <hasta>\\n/expira <uid> <fecha|none>\\n\\n*Eventos:*\\n/ultimos [n]\\n\\n*Admin:*\\n/lockdown on|off\\n/ttl <segundos>`};\nreturn msg;",
-    "outputs": 1,
-    "x": 980,
-    "y": 610,
-    "wires": [
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  },
-  {
-    "id": "sqlite-audit-bot",
-    "type": "sqlite",
-    "z": "tab-telegram",
-    "mydb": "config-sqlite",
-    "sqlquery": "msg.topic",
-    "name": "Audit",
-    "x": 1200,
-    "y": 490,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "mqtt-cmd-out",
-    "type": "mqtt out",
-    "z": "tab-telegram",
-    "name": "Publicar comando MQTT",
-    "topic": "",
-    "qos": "1",
-    "retain": false,
-    "broker": "config-mqtt",
-    "x": 1200,
-    "y": 550,
-    "wires": []
-  },
-  {
-    "id": "telegram-send-bot",
-    "type": "telegram sender",
-    "z": "tab-telegram",
-    "name": "Responder bot",
-    "bot": "config-telegram",
-    "outputs": 1,
-    "x": 1700,
-    "y": 600,
-    "wires": [
-      []
-    ]
-  },
-  {
-    "id": "fn-usuarios",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "/usuarios",
-    "func": "msg.topic = \"SELECT uid, name, schedule, expires_at, enabled FROM users ORDER BY name\";\nreturn msg;",
-    "outputs": 1,
-    "x": 1000,
-    "y": 420,
-    "wires": [
-      [
-        "sqlite-query-usuarios"
-      ]
-    ]
-  },
-  {
-    "id": "sqlite-query-usuarios",
-    "type": "sqlite",
-    "z": "tab-telegram",
-    "mydb": "config-sqlite",
-    "sqlquery": "msg.topic",
-    "name": "SELECT users",
-    "x": 1180,
-    "y": 420,
-    "wires": [
-      [
-        "fn-format-usuarios"
-      ]
-    ]
-  },
-  {
-    "id": "fn-format-usuarios",
-    "type": "function",
-    "z": "tab-telegram",
-    "name": "Formatear usuarios",
-    "func": "const rows = msg.payload;\nif (!rows||!rows.length) {\n    msg.payload = {chatId:msg._chatId, type:'message', content:'No hay usuarios registrados.'};\n} else {\n    const lines = rows.map(r => {\n        const estado = r.enabled ? '✅' : '❌';\n        const expira = r.expires_at ? ` | exp: ${r.expires_at.slice(0,10)}` : '';\n        const horario = r.schedule ? ' | 🕐' : '';\n        return `${estado} ${r.name} — \\`${r.uid}\\`${expira}${horario}`;\n    });\n    msg.payload = {chatId:msg._chatId, type:'message', content:`👥 *Usuarios registrados (${rows.length}):*\\n${lines.join('\\n')}`, options:{parse_mode:'Markdown'}};\n}\nreturn msg;",
-    "outputs": 1,
-    "x": 1360,
-    "y": 420,
-    "wires": [
-      [
-        "telegram-send-bot"
-      ]
-    ]
-  }
+    {
+        "id": "tab-init",
+        "type": "tab",
+        "label": "Init & Schema",
+        "disabled": false
+    },
+    {
+        "id": "tab-cache-miss",
+        "type": "tab",
+        "label": "Cache Miss Handler",
+        "disabled": false
+    },
+    {
+        "id": "tab-events",
+        "type": "tab",
+        "label": "Event Recorder",
+        "disabled": false
+    },
+    {
+        "id": "tab-status",
+        "type": "tab",
+        "label": "Status Monitor",
+        "disabled": false
+    },
+    {
+        "id": "tab-telegram",
+        "type": "tab",
+        "label": "Telegram Bot",
+        "disabled": false
+    },
+    {
+        "id": "config-mqtt",
+        "type": "mqtt-broker",
+        "name": "Mosquitto",
+        "broker": "mosquitto",
+        "port": "1883",
+        "clientid": "nodered-access-ctrl",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "30",
+        "cleansession": true
+    },
+    {
+        "id": "config-influxdb",
+        "type": "influxdb",
+        "hostname": "influxdb",
+        "port": "8086",
+        "protocol": "http",
+        "database": "iot",
+        "name": "InfluxDB",
+        "usetls": false,
+        "influxdbVersion": "1.x",
+        "url": "http://influxdb:8086",
+        "rejectUnauthorized": true
+    },
+    {
+        "id": "config-sqlite",
+        "type": "sqlitedb",
+        "db": "/data/sqlite/access.db",
+        "mode": "RWC"
+    },
+    {
+        "id": "config-telegram",
+        "type": "telegram bot",
+        "botname": "AccessControlBot",
+        "usernames": "",
+        "chatids": "",
+        "baseapiurl": "",
+        "testenvironment": false,
+        "updatemode": "polling",
+        "addressfamily": "4",
+        "pollinterval": "300",
+        "usesocks": false,
+        "sockshost": "",
+        "socksport": "",
+        "socksusername": "",
+        "sockspassword": "",
+        "bothost": "",
+        "botpath": "",
+        "localbothost": "",
+        "localbotport": "",
+        "publicbotport": "",
+        "privatekey": "",
+        "certificate": "",
+        "useselfsignedcertificate": false,
+        "sslterminated": false,
+        "verboselogging": false
+    },
+    {
+        "id": "inject-init",
+        "type": "inject",
+        "z": "tab-init",
+        "name": "Aplicar schema al arrancar",
+        "repeat": "",
+        "once": true,
+        "onceDelay": "2",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 80,
+        "wires": [
+            [
+                "fn-read-schema"
+            ]
+        ]
+    },
+    {
+        "id": "fn-read-schema",
+        "type": "function",
+        "z": "tab-init",
+        "name": "Cargar SQL schema",
+        "func": "msg.topic = `\nCREATE TABLE IF NOT EXISTS users (\n    uid        TEXT PRIMARY KEY,\n    name       TEXT NOT NULL,\n    schedule   TEXT DEFAULT NULL,\n    expires_at TEXT DEFAULT NULL,\n    enabled    INTEGER NOT NULL DEFAULT 1,\n    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),\n    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))\n);\nCREATE TABLE IF NOT EXISTS audit (\n    id         INTEGER PRIMARY KEY AUTOINCREMENT,\n    ts         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),\n    actor      TEXT NOT NULL,\n    action     TEXT NOT NULL,\n    target_uid TEXT,\n    details    TEXT\n);\nCREATE INDEX IF NOT EXISTS idx_audit_ts  ON audit(ts DESC);\nCREATE INDEX IF NOT EXISTS idx_audit_uid ON audit(target_uid);\n`;\nreturn msg;",
+        "outputs": 1,
+        "x": 380,
+        "y": 80,
+        "wires": [
+            [
+                "sqlite-init"
+            ]
+        ]
+    },
+    {
+        "id": "sqlite-init",
+        "type": "sqlite",
+        "z": "tab-init",
+        "mydb": "config-sqlite",
+        "sqlquery": "batch",
+        "name": "Crear tablas",
+        "x": 600,
+        "y": 80,
+        "wires": [
+            [
+                "debug-init"
+            ]
+        ]
+    },
+    {
+        "id": "debug-init",
+        "type": "debug",
+        "z": "tab-init",
+        "name": "Schema OK",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 800,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "mqtt-request",
+        "type": "mqtt in",
+        "z": "tab-cache-miss",
+        "name": "access/+/request",
+        "topic": "access/+/request",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "config-mqtt",
+        "inputs": 0,
+        "x": 120,
+        "y": 100,
+        "wires": [
+            [
+                "fn-parse-request"
+            ]
+        ]
+    },
+    {
+        "id": "fn-parse-request",
+        "type": "function",
+        "z": "tab-cache-miss",
+        "name": "Extraer device_id y uid",
+        "func": "const parts = msg.topic.split('/');\nconst deviceId = parts[1];\nconst {uid, req_id} = msg.payload;\nif (!uid || !req_id) { node.warn('Request malformado: ' + JSON.stringify(msg.payload)); return null; }\nmsg.deviceId = deviceId;\nmsg.uid = uid.toUpperCase();\nmsg.req_id = req_id;\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg.topic = \"SELECT uid, name, schedule, expires_at, enabled FROM users WHERE uid = '\" + esc(msg.uid) + \"'\";\nreturn msg;",
+        "outputs": 1,
+        "x": 340,
+        "y": 100,
+        "wires": [
+            [
+                "sqlite-lookup"
+            ]
+        ]
+    },
+    {
+        "id": "sqlite-lookup",
+        "type": "sqlite",
+        "z": "tab-cache-miss",
+        "mydb": "config-sqlite",
+        "sqlquery": "msg.topic",
+        "name": "Buscar usuario",
+        "x": 560,
+        "y": 100,
+        "wires": [
+            [
+                "fn-decide-access"
+            ]
+        ]
+    },
+    {
+        "id": "fn-decide-access",
+        "type": "function",
+        "z": "tab-cache-miss",
+        "name": "Evaluar acceso",
+        "func": "const lockdown   = flow.get('lockdown') || false;\nconst defaultTtl = flow.get('cache_ttl_s') || 86400;\nconst {uid, deviceId, req_id} = msg;\nconst rows = msg.payload;\n\nlet allowed = false;\nlet reason  = '';\nlet ttl     = defaultTtl;\n\nif (lockdown) {\n    reason = 'lockdown';\n} else if (!rows || rows.length === 0) {\n    reason = 'user_not_found';\n} else {\n    const u = rows[0];\n    if (!u.enabled) {\n        reason = 'disabled';\n    } else if (u.expires_at && new Date(u.expires_at) < new Date()) {\n        reason = 'expired';\n    } else if (u.schedule) {\n        const sched = JSON.parse(u.schedule);\n        const now = new Date();\n        const day = now.getDay();\n        const hhmm = now.getHours() * 60 + now.getMinutes();\n        const [fH, fM] = sched.from.split(':').map(Number);\n        const [tH, tM] = sched.to.split(':').map(Number);\n        const fromMin = fH * 60 + fM;\n        const toMin   = tH * 60 + tM;\n        if (!sched.days.includes(day) || hhmm < fromMin || hhmm >= toMin) {\n            reason = 'out_of_schedule';\n        } else {\n            allowed = true;\n            ttl = Math.min(defaultTtl, (toMin - hhmm) * 60);\n        }\n    } else {\n        allowed = true;\n        if (u.expires_at) {\n            ttl = Math.min(defaultTtl, Math.floor((new Date(u.expires_at) - new Date()) / 1000));\n        }\n    }\n}\n\nconst response = {req_id, uid, allowed};\nif (allowed) response.ttl = ttl;\n\nnode.log(`[${deviceId}] UID=${uid} allowed=${allowed} reason=${reason || 'ok'}`);\nmsg.topic   = `access/${deviceId}/response`;\nmsg.payload = response;\nmsg.qos     = 1;\nmsg.retain  = false;\nreturn msg;",
+        "outputs": 1,
+        "x": 780,
+        "y": 100,
+        "wires": [
+            [
+                "mqtt-response"
+            ]
+        ]
+    },
+    {
+        "id": "mqtt-response",
+        "type": "mqtt out",
+        "z": "tab-cache-miss",
+        "name": "Publicar respuesta",
+        "topic": "",
+        "qos": "1",
+        "retain": false,
+        "broker": "config-mqtt",
+        "x": 1010,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "mqtt-events",
+        "type": "mqtt in",
+        "z": "tab-events",
+        "name": "access/+/event",
+        "topic": "access/+/event",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "config-mqtt",
+        "inputs": 0,
+        "x": 120,
+        "y": 120,
+        "wires": [
+            [
+                "fn-parse-event"
+            ]
+        ]
+    },
+    {
+        "id": "fn-parse-event",
+        "type": "function",
+        "z": "tab-events",
+        "name": "Parsear y distribuir",
+        "func": "const parts = msg.topic.split('/');\nconst deviceId = parts[1];\nconst {uid, outcome, source, ts} = msg.payload;\nif (!uid || !outcome) { node.warn('Evento malformado: ' + JSON.stringify(msg.payload)); return [null,null,null]; }\nmsg.deviceId = deviceId;\nmsg.uid      = uid.toUpperCase();\nmsg.outcome  = outcome;\nmsg.source   = source || 'unknown';\nmsg.eventTs  = ts || new Date().toISOString();\n// Salida 0: InfluxDB, Salida 1: SQLite audit, Salida 2: alerta denied\nreturn [msg, msg, outcome === 'denied' ? msg : null];",
+        "outputs": 3,
+        "x": 340,
+        "y": 120,
+        "wires": [
+            [
+                "fn-influx-format"
+            ],
+            [
+                "fn-sqlite-audit-event"
+            ],
+            [
+                "fn-denied-alert"
+            ]
+        ]
+    },
+    {
+        "id": "fn-influx-format",
+        "type": "function",
+        "z": "tab-events",
+        "name": "Formatear para InfluxDB",
+        "func": "// Format: [fields, tags] — measurement is set on the influxdb out node\nmsg.payload = [\n    { count: 1 },\n    { device_id: msg.deviceId, uid: msg.uid, outcome: msg.outcome, source: msg.source }\n];\nreturn msg;",
+        "outputs": 1,
+        "x": 560,
+        "y": 60,
+        "wires": [
+            [
+                "influx-out-events"
+            ]
+        ]
+    },
+    {
+        "id": "influx-out-events",
+        "type": "influxdb out",
+        "z": "tab-events",
+        "influxdb": "config-influxdb",
+        "name": "InfluxDB access_events",
+        "measurement": "access_events",
+        "precision": "ms",
+        "database": "iot",
+        "x": 800,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "fn-sqlite-audit-event",
+        "type": "function",
+        "z": "tab-events",
+        "name": "Preparar INSERT audit",
+        "func": "const esc = s => String(s||'').replace(/'/g, \"''\");\nconst details = JSON.stringify({source: msg.source, ts: msg.eventTs});\nmsg.topic = \"INSERT INTO audit (actor, action, target_uid, details) VALUES ('\" + esc(msg.deviceId) + \"', 'access_\" + esc(msg.outcome) + \"', '\" + esc(msg.uid) + \"', '\" + esc(details) + \"')\";\nreturn msg;",
+        "outputs": 1,
+        "x": 580,
+        "y": 120,
+        "wires": [
+            [
+                "sqlite-audit-events"
+            ]
+        ]
+    },
+    {
+        "id": "sqlite-audit-events",
+        "type": "sqlite",
+        "z": "tab-events",
+        "mydb": "config-sqlite",
+        "sqlquery": "msg.topic",
+        "name": "Escribir audit",
+        "x": 800,
+        "y": 120,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "fn-denied-alert",
+        "type": "function",
+        "z": "tab-events",
+        "name": "Armar alerta denegado",
+        "func": "const ids = (env.get('TELEGRAM_ADMIN_IDS') || '').split(',').map(s => s.trim()).filter(Boolean);\nif (!ids.length) return null;\nconst content = `⛔ Acceso DENEGADO\\nDispositivo: ${msg.deviceId}\\nUID: ${msg.uid}\\nMotivo: ${msg.source}\\nHora: ${msg.eventTs}`;\nreturn [ ids.map(id => ({ payload: { chatId: parseInt(id), type: 'message', content } })) ];",
+        "outputs": 1,
+        "x": 580,
+        "y": 180,
+        "wires": [
+            [
+                "telegram-send-events"
+            ]
+        ]
+    },
+    {
+        "id": "telegram-send-events",
+        "type": "telegram sender",
+        "z": "tab-events",
+        "name": "Enviar alerta",
+        "bot": "config-telegram",
+        "outputs": 1,
+        "x": 800,
+        "y": 180,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "mqtt-status",
+        "type": "mqtt in",
+        "z": "tab-status",
+        "name": "access/+/status",
+        "topic": "access/+/status",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "config-mqtt",
+        "inputs": 0,
+        "x": 120,
+        "y": 100,
+        "wires": [
+            [
+                "fn-check-status"
+            ]
+        ]
+    },
+    {
+        "id": "fn-check-status",
+        "type": "function",
+        "z": "tab-status",
+        "name": "Detectar dispositivo offline",
+        "func": "const deviceId = msg.topic.split('/')[1];\nconst {online} = msg.payload;\nif (online !== false) return null;\nconst ids = (env.get('TELEGRAM_ADMIN_IDS') || '').split(',').map(s => s.trim()).filter(Boolean);\nif (!ids.length) return null;\nconst content = `🔴 DISPOSITIVO OFFLINE\\nID: ${deviceId}\\nHora: ${new Date().toISOString()}`;\nreturn [ ids.map(id => ({ payload: { chatId: parseInt(id), type: 'message', content } })) ];",
+        "outputs": 1,
+        "x": 360,
+        "y": 100,
+        "wires": [
+            [
+                "telegram-send-status"
+            ]
+        ]
+    },
+    {
+        "id": "telegram-send-status",
+        "type": "telegram sender",
+        "z": "tab-status",
+        "name": "Notificar offline",
+        "bot": "config-telegram",
+        "outputs": 1,
+        "x": 600,
+        "y": 100,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "telegram-receiver",
+        "type": "telegram receiver",
+        "z": "tab-telegram",
+        "name": "Recibir comandos",
+        "bot": "config-telegram",
+        "saveDataDir": "",
+        "filterCommands": true,
+        "hasinput": false,
+        "inputs": 0,
+        "handleallupdates": false,
+        "handleprocessupdates": false,
+        "x": 130,
+        "y": 80,
+        "wires": [
+            [
+                "fn-auth-check"
+            ],
+            []
+        ]
+    },
+    {
+        "id": "fn-auth-check",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "Verificar admin",
+        "func": "const ids = (env.get('TELEGRAM_ADMIN_IDS') || '').split(',').map(s => s.trim());\nconst chatId = String(msg.payload.chatId);\nif (!ids.includes(chatId)) {\n    node.warn('No autorizado chatId: ' + chatId);\n    node.send([null, {payload:{chatId:msg.payload.chatId,type:'message',content:'⛔ No autorizado.'}}]);\n    return null;\n}\nreturn [msg, null];",
+        "outputs": 2,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 330,
+        "y": 80,
+        "wires": [
+            [
+                "fn-setup-ctx"
+            ],
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "fn-setup-ctx",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "Preparar contexto del mensaje",
+        "func": "const text = (msg.payload.content || '').trim();\nconst parts = text.split(/\\s+/);\nmsg._cmd    = parts[0].toLowerCase();\nmsg._parts  = parts;\nmsg._chatId = msg.payload.chatId;\nmsg._actor  = (msg.payload.from && msg.payload.from.username) ? msg.payload.from.username : String(msg.payload.chatId);\nreturn msg;",
+        "outputs": 1,
+        "x": 530,
+        "y": 80,
+        "wires": [
+            [
+                "fn-router"
+            ]
+        ]
+    },
+    {
+        "id": "fn-router",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "Router de comandos",
+        "func": "const routes = {'/alta':0,'/baja':1,'/habilitar':2,'/deshabilitar':3,'/horario':4,'/expira':5,'/usuario':6,'/ultimos':7,'/lockdown':8,'/ttl':9,'/ayuda':10,'/usuarios':11};\nconst idx = routes[msg._cmd];\nif (idx === undefined) {\n    node.send(Array(13).fill(null).map((_,i) => i===12 ? {payload:{chatId:msg._chatId,type:'message',content:'Comando desconocido. Usá /ayuda.'}} : null));\n    return null;\n}\nconst out = Array(13).fill(null);\nout[idx] = msg;\nreturn out;",
+        "outputs": 13,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 740,
+        "y": 80,
+        "wires": [
+            [
+                "fn-alta"
+            ],
+            [
+                "fn-baja"
+            ],
+            [
+                "fn-habilitar"
+            ],
+            [
+                "fn-deshabilitar"
+            ],
+            [
+                "fn-horario"
+            ],
+            [
+                "fn-expira"
+            ],
+            [
+                "fn-usuario"
+            ],
+            [
+                "fn-ultimos"
+            ],
+            [
+                "fn-lockdown"
+            ],
+            [
+                "fn-ttl"
+            ],
+            [
+                "fn-ayuda"
+            ],
+            [
+                "fn-usuarios"
+            ],
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "fn-alta",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "/alta",
+        "func": "const [,uid,...rest] = msg._parts;\nif (!uid || !rest.length) { node.send([null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /alta <uid> <nombre>'}}]); return null; }\nconst name = rest.join(' ');\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg._uid = uid.toUpperCase(); msg._name = name; msg._action = 'create'; msg._details = JSON.stringify({name});\nmsg.topic = \"INSERT INTO users (uid, name) VALUES ('\" + esc(msg._uid) + \"', '\" + esc(name) + \"') ON CONFLICT(uid) DO UPDATE SET name=excluded.name, enabled=1, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now')\";\nreturn [msg, null];",
+        "outputs": 2,
+        "x": 980,
+        "y": 20,
+        "wires": [
+            [
+                "sqlite-cmd-exec"
+            ],
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "fn-baja",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "/baja",
+        "func": "const [,uid] = msg._parts;\nif (!uid) { node.send([null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /baja <uid>'}}]); return null; }\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg._uid = uid.toUpperCase(); msg._action = 'disable'; msg._details = null;\nmsg.topic = \"UPDATE users SET enabled=0, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE uid='\" + esc(msg._uid) + \"'\";\nreturn [msg, null];",
+        "outputs": 2,
+        "x": 980,
+        "y": 70,
+        "wires": [
+            [
+                "sqlite-cmd-exec"
+            ],
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "fn-habilitar",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "/habilitar",
+        "func": "const [,uid] = msg._parts;\nif (!uid) { node.send([null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /habilitar <uid>'}}]); return null; }\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg._uid = uid.toUpperCase(); msg._action = 'enable'; msg._details = null;\nmsg.topic = \"UPDATE users SET enabled=1, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE uid='\" + esc(msg._uid) + \"'\";\nreturn [msg, null];",
+        "outputs": 2,
+        "x": 980,
+        "y": 120,
+        "wires": [
+            [
+                "sqlite-cmd-exec"
+            ],
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "fn-deshabilitar",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "/deshabilitar",
+        "func": "const [,uid] = msg._parts;\nif (!uid) { node.send([null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /deshabilitar <uid>'}}]); return null; }\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg._uid = uid.toUpperCase(); msg._action = 'disable'; msg._details = null;\nmsg.topic = \"UPDATE users SET enabled=0, updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE uid='\" + esc(msg._uid) + \"'\";\nreturn [msg, null];",
+        "outputs": 2,
+        "x": 980,
+        "y": 170,
+        "wires": [
+            [
+                "sqlite-cmd-exec"
+            ],
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "fn-horario",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "/horario",
+        "func": "// /horario <uid> <dias_csv> <HH:MM> <HH:MM>\nconst [,uid,diasStr,desde,hasta] = msg._parts;\nif (!uid||!diasStr||!desde||!hasta) { node.send([null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /horario <uid> <dias_csv> <HH:MM> <HH:MM>\\nEj: /horario AABB1234 1,2,3,4,5 08:00 18:00'}}]); return null; }\nconst schedule = JSON.stringify({days: diasStr.split(',').map(Number), from: desde, to: hasta});\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg._uid = uid.toUpperCase(); msg._action = 'set_schedule'; msg._details = schedule;\nmsg.topic = \"UPDATE users SET schedule='\" + esc(schedule) + \"', updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE uid='\" + esc(msg._uid) + \"'\";\nreturn [msg, null];",
+        "outputs": 2,
+        "x": 980,
+        "y": 220,
+        "wires": [
+            [
+                "sqlite-cmd-exec"
+            ],
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "fn-expira",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "/expira",
+        "func": "// /expira <uid> <ISO8601|none>\nconst [,uid,fecha] = msg._parts;\nif (!uid||!fecha) { node.send([null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /expira <uid> <ISO8601|none>'}}]); return null; }\nconst expiresAt = fecha.toLowerCase()==='none' ? null : fecha;\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg._uid = uid.toUpperCase(); msg._action = 'set_expiry'; msg._details = JSON.stringify({expires_at: expiresAt});\nconst expiresVal = expiresAt === null ? 'NULL' : \"'\" + esc(expiresAt) + \"'\";\nmsg.topic = \"UPDATE users SET expires_at=\" + expiresVal + \", updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE uid='\" + esc(msg._uid) + \"'\";\nreturn [msg, null];",
+        "outputs": 2,
+        "x": 980,
+        "y": 270,
+        "wires": [
+            [
+                "sqlite-cmd-exec"
+            ],
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "sqlite-cmd-exec",
+        "type": "sqlite",
+        "z": "tab-telegram",
+        "mydb": "config-sqlite",
+        "sqlquery": "msg.topic",
+        "name": "Ejecutar SQL",
+        "x": 1200,
+        "y": 145,
+        "wires": [
+            [
+                "fn-post-write"
+            ]
+        ]
+    },
+    {
+        "id": "fn-post-write",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "Post-write: audit + invalidar + reply",
+        "func": "const {_uid:uid, _action:action, _actor:actor, _details:details, _chatId:chatId, _name:name} = msg;\nconst esc = s => String(s||'').replace(/'/g, \"''\");\n\n// 1) Audit\nconst am = {topic:\"INSERT INTO audit (actor,action,target_uid,details) VALUES ('\" + esc(actor) + \"','\" + esc(action) + \"','\" + esc(uid) + \"','\" + esc(details) + \"')\"};\n// 2) Invalidar cache en ESP32\nconst im = {topic:'access/door01/command/invalidate', payload:JSON.stringify({uid}), qos:1, retain:false};\n// 3) Reply Telegram\nconst icons = {create:'✅',enable:'✅',disable:'❌',set_schedule:'📅',set_expiry:'⏱️'};\nconst icon  = icons[action] || 'ℹ️';\nconst label = name ? ` (${name})` : '';\nconst rm = {payload:{chatId, type:'message', content:`${icon} \\`${action}\\` aplicado sobre UID \\`${uid}\\`${label}.`, options:{parse_mode:'Markdown'}}};\n\nnode.send([am, im, rm]);\nreturn null;",
+        "outputs": 3,
+        "x": 1420,
+        "y": 145,
+        "wires": [
+            [
+                "sqlite-audit-bot"
+            ],
+            [
+                "mqtt-cmd-out"
+            ],
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "fn-usuario",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "/usuario",
+        "func": "const [,uid] = msg._parts;\nif (!uid) { node.send([{payload:{chatId:msg._chatId,type:'message',content:'Uso: /usuario <uid>'}}]); return null; }\nconst esc = s => String(s||'').replace(/'/g, \"''\");\nmsg.topic = \"SELECT uid,name,schedule,expires_at,enabled,created_at FROM users WHERE uid='\" + esc(uid.toUpperCase()) + \"'\";\nreturn msg;",
+        "outputs": 1,
+        "x": 980,
+        "y": 360,
+        "wires": [
+            [
+                "sqlite-query-user"
+            ]
+        ]
+    },
+    {
+        "id": "sqlite-query-user",
+        "type": "sqlite",
+        "z": "tab-telegram",
+        "mydb": "config-sqlite",
+        "sqlquery": "msg.topic",
+        "name": "SELECT user",
+        "x": 1180,
+        "y": 360,
+        "wires": [
+            [
+                "fn-format-user"
+            ]
+        ]
+    },
+    {
+        "id": "fn-format-user",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "Formatear usuario",
+        "func": "const rows = msg.payload;\nlet text;\nif (!rows||!rows.length) {\n    text = '❌ Usuario no encontrado.';\n} else {\n    const u = rows[0];\n    text = `👤 *Usuario*\\nUID: \\`${u.uid}\\`\\nNombre: ${u.name}\\nEstado: ${u.enabled?'✅ Habilitado':'❌ Deshabilitado'}\\nHorario: ${u.schedule||'Sin restricción'}\\nExpira: ${u.expires_at||'No expira'}\\nAlta: ${u.created_at}`;\n}\nmsg.payload = {chatId:msg._chatId, type:'message', content:text, options:{parse_mode:'Markdown'}};\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1380,
+        "y": 360,
+        "wires": [
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "fn-ultimos",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "/ultimos",
+        "func": "const n = Math.min(parseInt(msg._parts[1])||10, 50);\nmsg.topic = `SELECT a.ts, a.target_uid, a.action, a.actor, u.name FROM audit a LEFT JOIN users u ON u.uid = a.target_uid WHERE a.action LIKE 'access_%' ORDER BY a.ts DESC LIMIT ${n}`;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 980,
+        "y": 420,
+        "wires": [
+            [
+                "sqlite-query-ultimos"
+            ]
+        ]
+    },
+    {
+        "id": "sqlite-query-ultimos",
+        "type": "sqlite",
+        "z": "tab-telegram",
+        "mydb": "config-sqlite",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "SELECT últimos",
+        "x": 1180,
+        "y": 420,
+        "wires": [
+            [
+                "fn-format-ultimos"
+            ]
+        ]
+    },
+    {
+        "id": "fn-format-ultimos",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "Formatear últimos",
+        "func": "const rows = msg.payload;\nif (!rows||!rows.length) {\n    msg.payload = {chatId:msg._chatId, type:'message', content:'No hay eventos registrados.'};\n} else {\n    const lines = rows.map(r => {\n        const ok = r.action.replace('access_','') === 'granted';\n        const who = r.name ? `${r.name} (${r.target_uid})` : (r.target_uid || 'desconocido');\n        return `${ok?'✅':'❌'} ${r.ts.slice(0,19)} | ${who} | ${r.actor}`;\n    });\n    msg.payload = {chatId:msg._chatId, type:'message', content:`*Últimos ${rows.length} eventos:*\\n\\`\\`\\`\\n${lines.join('\\n')}\\n\\`\\`\\``, options:{parse_mode:'Markdown'}};\n}\nreturn msg;",
+        "outputs": 1,
+        "x": 1380,
+        "y": 420,
+        "wires": [
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "fn-lockdown",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "/lockdown",
+        "func": "const [,state] = msg._parts;\nif (state!=='on'&&state!=='off') { node.send([null,null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /lockdown on|off'}}]); return null; }\nconst enabled = state==='on';\nflow.set('lockdown', enabled);\nconst im = {topic:'access/door01/command/lockdown', payload:JSON.stringify({enabled}), qos:1, retain:true};\nconst am = {topic:\"INSERT INTO audit (actor,action,target_uid,details) VALUES (?,?,NULL,NULL)\", params:[msg._actor, enabled?'lockdown_on':'lockdown_off']};\nconst rm = {payload:{chatId:msg._chatId, type:'message', content:`${enabled?'🔒 LOCKDOWN ACTIVADO — todas las tarjetas serán denegadas.':'🔓 Lockdown desactivado.'}`}};\nnode.send([im, am, rm]);\nreturn null;",
+        "outputs": 3,
+        "x": 980,
+        "y": 490,
+        "wires": [
+            [
+                "mqtt-cmd-out"
+            ],
+            [
+                "sqlite-audit-bot"
+            ],
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "fn-ttl",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "/ttl",
+        "func": "const secs = parseInt(msg._parts[1]);\nif (!secs||secs<60||secs>2592000) { node.send([null,null,{payload:{chatId:msg._chatId,type:'message',content:'Uso: /ttl <segundos> (60 a 2592000)'}}]); return null; }\nflow.set('cache_ttl_s', secs);\nconst im = {topic:'access/door01/command/config', payload:JSON.stringify({cache_ttl_s:secs}), qos:1, retain:false};\nconst am = {topic:\"INSERT INTO audit (actor,action,target_uid,details) VALUES (?,?,NULL,?)\", params:[msg._actor,'set_ttl',JSON.stringify({ttl:secs})]};\nconst rm = {payload:{chatId:msg._chatId, type:'message', content:`⚙️ TTL actualizado a ${secs}s (${(secs/3600).toFixed(1)}h).`}};\nnode.send([im, am, rm]);\nreturn null;",
+        "outputs": 3,
+        "x": 980,
+        "y": 550,
+        "wires": [
+            [
+                "mqtt-cmd-out"
+            ],
+            [
+                "sqlite-audit-bot"
+            ],
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "fn-ayuda",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "/ayuda",
+        "func": "msg.payload = {chatId:msg._chatId, type:'message', options:{parse_mode:'Markdown'}, content:`🔐 *Control de Acceso RFID*\\n\\n*Usuarios:*\\n/alta <uid> <nombre>\\n/baja <uid>\\n/habilitar <uid>\\n/deshabilitar <uid>\\n/usuario <uid>\\n/usuarios\\n/horario <uid> <dias> <desde> <hasta>\\n/expira <uid> <fecha|none>\\n\\n*Eventos:*\\n/ultimos [n]\\n\\n*Admin:*\\n/lockdown on|off\\n/ttl <segundos>`};\nreturn msg;",
+        "outputs": 1,
+        "x": 980,
+        "y": 610,
+        "wires": [
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    },
+    {
+        "id": "sqlite-audit-bot",
+        "type": "sqlite",
+        "z": "tab-telegram",
+        "mydb": "config-sqlite",
+        "sqlquery": "msg.topic",
+        "name": "Audit",
+        "x": 1200,
+        "y": 490,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "mqtt-cmd-out",
+        "type": "mqtt out",
+        "z": "tab-telegram",
+        "name": "Publicar comando MQTT",
+        "topic": "",
+        "qos": "1",
+        "retain": false,
+        "broker": "config-mqtt",
+        "x": 1200,
+        "y": 550,
+        "wires": []
+    },
+    {
+        "id": "telegram-send-bot",
+        "type": "telegram sender",
+        "z": "tab-telegram",
+        "name": "Responder bot",
+        "bot": "config-telegram",
+        "outputs": 1,
+        "x": 1700,
+        "y": 600,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "fn-usuarios",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "/usuarios",
+        "func": "msg.topic = \"SELECT uid, name, schedule, expires_at, enabled FROM users ORDER BY name\";\nreturn msg;",
+        "outputs": 1,
+        "x": 1000,
+        "y": 420,
+        "wires": [
+            [
+                "sqlite-query-usuarios"
+            ]
+        ]
+    },
+    {
+        "id": "sqlite-query-usuarios",
+        "type": "sqlite",
+        "z": "tab-telegram",
+        "mydb": "config-sqlite",
+        "sqlquery": "msg.topic",
+        "name": "SELECT users",
+        "x": 1180,
+        "y": 420,
+        "wires": [
+            [
+                "fn-format-usuarios"
+            ]
+        ]
+    },
+    {
+        "id": "fn-format-usuarios",
+        "type": "function",
+        "z": "tab-telegram",
+        "name": "Formatear usuarios",
+        "func": "const rows = msg.payload;\nif (!rows||!rows.length) {\n    msg.payload = {chatId:msg._chatId, type:'message', content:'No hay usuarios registrados.'};\n} else {\n    const lines = rows.map(r => {\n        const estado = r.enabled ? '✅' : '❌';\n        const expira = r.expires_at ? ` | exp: ${r.expires_at.slice(0,10)}` : '';\n        const horario = r.schedule ? ' | 🕐' : '';\n        return `${estado} ${r.name} — \\`${r.uid}\\`${expira}${horario}`;\n    });\n    msg.payload = {chatId:msg._chatId, type:'message', content:`👥 *Usuarios registrados (${rows.length}):*\\n${lines.join('\\n')}`, options:{parse_mode:'Markdown'}};\n}\nreturn msg;",
+        "outputs": 1,
+        "x": 1360,
+        "y": 420,
+        "wires": [
+            [
+                "telegram-send-bot"
+            ]
+        ]
+    }
 ]
